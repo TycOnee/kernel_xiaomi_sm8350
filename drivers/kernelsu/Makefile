@@ -27,6 +27,11 @@ ifeq ($(shell grep -q " current_sid(void)" $(srctree)/security/selinux/include/o
 ccflags-y += -DKSU_COMPAT_HAS_CURRENT_SID
 endif
 
+# This feature is introduced in linux 5.0-rc1
+ifeq ($(shell grep -q "get_cred_rcu" $(srctree)/include/linux/cred.h; echo $$?),0)
+ccflags-y += -DKSU_GET_CRED_RCU
+endif
+
 ifndef KSU_EXPECTED_SIZE
 KSU_EXPECTED_SIZE := 0x033b
 endif
