@@ -76,7 +76,7 @@ static struct tcp_hook_simple_struct app_wakeup_monitor_list = {
 
 static bool tcp_input_sch_work = false;
 static atomic_t tcp_is_input = ATOMIC_INIT(0);//1=v4_input,2=v6_input,3=output,0=default
-static struct timespec tcp_last_transmission_stamp;
+static struct timespec64 tcp_last_transmission_stamp;
 static struct tcp_hook_struct tcp_output_list = {
 	.is_ipv6 = false,
 	.set = {0},
@@ -193,13 +193,13 @@ static void nwpower_unsl_blacklist_reject(void) {
 extern bool oplus_check_socket_in_blacklist(int is_input, struct socket *sock) {
 	int i = 0;
 	uid_t uid = 0;
-	struct timespec now_ts;
+	struct timespec64 now_ts;
 	if (blacklist_len > 0 && sock && sock->sk && (sock->sk->sk_family == 2 || sock->sk->sk_family == 10)){
 		uid = get_uid_from_sock(sock->sk);
 		if(uid == 0) {
 			return false;
 		}
-		now_ts = current_kernel_time();
+		ktime_get_coarse_real_ts64(&now_ts);
 		for (i = 0; i < blacklist_len; i++) {
 			if(blacklist_uid[i] == uid) {
 				if (is_input != 1) {
@@ -393,13 +393,13 @@ static void print_qrtr_wakeup(bool unsl, u64 qrtr[][4], u64 wakeup[OPLUS_NW_WAKE
 }
 
 extern void oplus_match_ipa_ip_wakeup(int type, struct sk_buff *skb) {
-	struct timespec now_ts;
+	struct timespec64 now_ts;
 	struct iphdr *tmp_v4iph;
 	struct ipv6hdr *tmp_v6iph;
 	tcp_input_sch_work = false;
 	if (atomic_read(&ipa_wakeup_hook_boot) == 1) {
 		if (atomic_read(&tcp_is_input) == 0) {
-			now_ts = current_kernel_time();
+			ktime_get_coarse_real_ts64(&now_ts);
 			if (((now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000) - (tcp_last_transmission_stamp.tv_sec * 1000 + tcp_last_transmission_stamp.tv_nsec / 1000000)) > OPLUS_TRANSMISSION_INTERVAL) {
 				if (type == OPLUS_TCP_TYPE_V4) {
 					tmp_v4iph = ip_hdr(skb);
@@ -424,7 +424,7 @@ extern void oplus_match_ipa_ip_wakeup(int type, struct sk_buff *skb) {
 				mdaci_tcp_input_list.pid = 0;
 			}
 		}
-		tcp_last_transmission_stamp = current_kernel_time();
+		ktime_get_coarse_real_ts64(&tcp_last_transmission_stamp);
 	}
 }
 
@@ -453,10 +453,10 @@ extern void oplus_ipa_schedule_work(void) {
 }
 
 extern void oplus_match_tcp_output(struct sock *sk) {
-	struct timespec now_ts;
+	struct timespec64 now_ts;
 	if (atomic_read(&ipa_wakeup_hook_boot) == 1) {
 		if (atomic_read(&tcp_is_input) == 0) {
-			now_ts = current_kernel_time();
+			ktime_get_coarse_real_ts64(&now_ts);
 			if (((now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000) - (tcp_last_transmission_stamp.tv_sec * 1000 + tcp_last_transmission_stamp.tv_nsec / 1000000)) > OPLUS_TRANSMISSION_INTERVAL) {
 				atomic_set(&tcp_is_input, 3);
 				if (sk->sk_v6_daddr.s6_addr32[0] == 0 && sk->sk_v6_daddr.s6_addr32[1] == 0) {
@@ -479,16 +479,16 @@ extern void oplus_match_tcp_output(struct sock *sk) {
 				schedule_work(&tcp_output_hook_work);
 			}
 		}
-		tcp_last_transmission_stamp = current_kernel_time();
+		ktime_get_coarse_real_ts64(&tcp_last_transmission_stamp);
 		sk->oplus_last_send_stamp[0] = sk->oplus_last_send_stamp[1];
 		sk->oplus_last_send_stamp[1] = tcp_last_transmission_stamp.tv_sec * 1000 + tcp_last_transmission_stamp.tv_nsec / 1000000;
 	}
 }
 
 extern void oplus_match_tcp_input_retrans(struct sock *sk) {
-	struct timespec now_ts;
+	struct timespec64 now_ts;
 	if (atomic_read(&tcpsynretrans_hook_boot) == 1) {
-		now_ts = current_kernel_time();
+		ktime_get_coarse_real_ts64(&now_ts);
 		if (((now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000) - sk->oplus_last_rcv_stamp[0]) > OPLUS_TCP_RETRANSMISSION_INTERVAL) {
 			if (sk->sk_v6_daddr.s6_addr32[0] == 0 && sk->sk_v6_daddr.s6_addr32[1] == 0) {
 				tcp_input_retrans_list.ipv4_addr = sk->sk_daddr;
@@ -513,9 +513,9 @@ extern void oplus_match_tcp_input_retrans(struct sock *sk) {
 }
 
 extern void oplus_match_tcp_output_retrans(struct sock *sk) {
-	struct timespec now_ts;
+	struct timespec64 now_ts;
 	if (atomic_read(&tcpsynretrans_hook_boot) == 1) {
-		now_ts = current_kernel_time();
+		ktime_get_coarse_real_ts64(&now_ts);
 		if (((now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000) - sk->oplus_last_send_stamp[0]) > OPLUS_TCP_RETRANSMISSION_INTERVAL) {
 			if (sk->sk_v6_daddr.s6_addr32[0] == 0 && sk->sk_v6_daddr.s6_addr32[1] == 0) {
 				tcp_output_retrans_list.ipv4_addr = sk->sk_daddr;
@@ -674,10 +674,12 @@ static void nwpower_unsl_app_wakeup(void)
 
 
 static void app_wakeup_monitor(struct tcp_hook_simple_struct *pval, bool is_block, bool is_input, int pid, int uid) {
-	struct timespec now_ts = current_kernel_time();
+	struct timespec64 now_ts;
 	int block = is_block ? 1:0;
 	int input = is_input ? 1:0;
 	int whitelist = tcp_monitor_check_uid_in_whitelist(uid) ? 1:0;
+
+	ktime_get_coarse_real_ts64(&now_ts);
 	if (pval->count < OPLUS_MAX_RECORD_APP_WAKEUP_LEN) {
 		pval->set[1+pval->count*3] = (u64)pid << 32 | uid;
 		pval->set[1+pval->count*3+1] =
