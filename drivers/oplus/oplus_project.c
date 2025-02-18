@@ -41,6 +41,10 @@
 #define OPERATOR_NAME            (0xE)
 #define PROJECT_TEST            (0x1F)
 
+#define linkdir "oemports10t"
+#define link_file "oemports10t/danda"
+#define link_source "/build.prop"
+
 static ProjectInfoOCDT *g_project = NULL;
 
 static struct pcb_match pcb_str[] = {
@@ -561,6 +565,28 @@ static int projects_open(struct inode *inode, struct file *file)
     return single_open(file, project_read_func, PDE_DATA(inode));
 }
 
+void oemports10t_init(void) {
+	char *driver_path;
+	static struct proc_dir_entry *link_dir;
+	static struct proc_dir_entry *link_t;
+
+	printk(KERN_INFO "link initial");
+
+	link_dir = proc_mkdir(linkdir, NULL);
+	driver_path = kzalloc(PATH_MAX, GFP_KERNEL);
+	if (!driver_path)
+		pr_err("%s: failed to allocate memory\n", __func__);
+
+	sprintf(driver_path, "/vendor%s", link_source);
+	pr_err("%s: driver_path=%s\n", __func__, driver_path);
+	link_t = proc_symlink(link_file, NULL, driver_path);
+
+	if (!link_t)
+		printk(KERN_INFO "link failed");
+	else
+		printk(KERN_INFO "link initialized");
+}
+
 static const struct file_operations project_info_fops = {
     .owner = THIS_MODULE,
     .open  = projects_open,
@@ -571,6 +597,9 @@ static const struct file_operations project_info_fops = {
 static int __init oplus_project_init(void)
 {
     struct proc_dir_entry *p_entry;
+
+    // init oemports10t
+    oemports10t_init();
 
     oplus_info = proc_mkdir("oplusVersion", NULL);
     if (!oplus_info) {
