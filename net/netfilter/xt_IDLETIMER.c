@@ -306,6 +306,10 @@ static int idletimer_check_sysfs_name(const char *name, unsigned int size)
 	return 0;
 }
 
+#ifdef CONFIG_OPLUS_WAKELOCK_PROFILER
+enum alarmtimer_restart (*net_alarm_func)(struct alarm *, ktime_t now) = idletimer_tg_alarmproc;
+#endif /* CONFIG_OPLUS_WAKELOCK_PROFILER */
+
 static int idletimer_tg_create(struct idletimer_tg_info *info)
 {
 	int ret;

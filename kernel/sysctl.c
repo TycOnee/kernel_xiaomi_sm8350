@@ -171,6 +171,10 @@ static unsigned long dirty_bytes_min = 2 * PAGE_SIZE;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
+#ifdef CONFIG_OPLUS_FEATURE_UXIO_FIRST
+unsigned int sysctl_uxio_io_opt = true;
+bool sysctl_wbt_enable = true;
+#endif
 static int minolduid;
 
 extern int sysctl_sched_yield_type;

@@ -11,6 +11,10 @@
 #include <linux/mailbox_controller.h>
 #include <dt-bindings/soc/qcom,ipcc.h>
 
+#ifdef CONFIG_OPLUS_WAKELOCK_PROFILER
+#include <oplus/oplus_wakelock_profiler.h>
+#endif /* CONFIG_OPLUS_WAKELOCK_PROFILER */
+
 /* IPCC Register offsets */
 #define IPCC_REG_SEND_ID		0x0C
 #define IPCC_REG_RECV_ID		0x10
@@ -331,6 +335,11 @@ static int qcom_ipcc_pm_resume(struct device *dev)
 	pr_warn("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
 		__func__, virq, name, qcom_ipcc_get_client_id(packed_id),
 		qcom_ipcc_get_signal_id(packed_id));
+
+#ifdef CONFIG_OPLUS_WAKELOCK_PROFILER
+	wakeup_reasons_statics(IRQ_NAME_GLINK, WS_CNT_GLINK);
+	wakeup_reasons_statics(name, WS_CNT_WLAN|WS_CNT_ADSP|WS_CNT_CDSP|WS_CNT_SLPI);
+#endif
 
 	return 0;
 }
